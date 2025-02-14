@@ -1,0 +1,123 @@
+// game.c
+#include "game.h"
+#include <stdio.h>
+#include <ctype.h>
+
+#define EMPTY '.' // Symbol for an empty cell
+#define SHIP 'S'  // Symbol for a ship cell
+
+char user_board[BOARD_SIZE_X][BOARD_SIZE_Y];
+
+// Initialize the board
+void initialize_board(void) {
+    for (int i = 0; i < BOARD_SIZE_X; i++) {
+        for (int j = 0; j < BOARD_SIZE_Y; j++) {
+            user_board[i][j] = EMPTY;
+        }
+    }
+}
+
+// Helper function to convert y-coordinate from char to index
+int y_to_index(char y) {
+    y = toupper(y);
+    if (y >= 'A' && y <= 'F') {
+        return y - 'A';
+    }
+    return -1; // Invalid input
+}
+
+// Place a ship on the board
+int place_ship(int x, char y, int ship_length, int orientation) {
+    int y_index = y_to_index(y);
+
+    if (x < 0 || x >= BOARD_SIZE_X || y_index < 0 || y_index >= BOARD_SIZE_Y) {
+        printf("Invalid starting coordinates.\n");
+        return -1; // Invalid coordinates
+    }
+
+    // Check placement validity based on orientation
+    switch (orientation) {
+        case 0: // Vertical down
+            if (x + ship_length > BOARD_SIZE_X) {
+                printf("Ship cannot fit vertically down.\n");
+                return -1;
+            }
+            for (int i = 0; i < ship_length; i++) {
+                if (user_board[x + i][y_index] != EMPTY) {
+                    printf("Placement overlaps with another ship.\n");
+                    return -1;
+                }
+            }
+            for (int i = 0; i < ship_length; i++) {
+                user_board[x + i][y_index] = SHIP;
+            }
+            break;
+
+        case 1: // Horizontal right
+            if (y_index + ship_length > BOARD_SIZE_Y) {
+                printf("Ship cannot fit horizontally to the right.\n");
+                return -1;
+            }
+            for (int i = 0; i < ship_length; i++) {
+                if (user_board[x][y_index + i] != EMPTY) {
+                    printf("Placement overlaps with another ship.\n");
+                    return -1;
+                }
+            }
+            for (int i = 0; i < ship_length; i++) {
+                user_board[x][y_index + i] = SHIP;
+            }
+            break;
+
+        case 2: // Vertical up
+            if (x - ship_length + 1 < 0) {
+                printf("Ship cannot fit vertically up.\n");
+                return -1;
+            }
+            for (int i = 0; i < ship_length; i++) {
+                if (user_board[x - i][y_index] != EMPTY) {
+                    printf("Placement overlaps with another ship.\n");
+                    return -1;
+                }
+            }
+            for (int i = 0; i < ship_length; i++) {
+                user_board[x - i][y_index] = SHIP;
+            }
+            break;
+
+        case 3: // Horizontal left
+            if (y_index - ship_length + 1 < 0) {
+                printf("Ship cannot fit horizontally to the left.\n");
+                return -1;
+            }
+            for (int i = 0; i < ship_length; i++) {
+                if (user_board[x][y_index - i] != EMPTY) {
+                    printf("Placement overlaps with another ship.\n");
+                    return -1;
+                }
+            }
+            for (int i = 0; i < ship_length; i++) {
+                user_board[x][y_index - i] = SHIP;
+            }
+            break;
+
+        default:
+            printf("Invalid orientation.\n");
+            return -1;
+    }
+
+    printf("Ship placed successfully.\n");
+    return 0; // Success
+}
+
+// Print the board for debugging purposes
+void print_board(void) {
+    printf("  A B C D E F\n");
+    for (int i = 0; i < BOARD_SIZE_X; i++) {
+        printf("%d ", i);
+        for (int j = 0; j < BOARD_SIZE_Y; j++) {
+            printf("%c ", user_board[i][j]);
+        }
+        printf("\n");
+    }
+}

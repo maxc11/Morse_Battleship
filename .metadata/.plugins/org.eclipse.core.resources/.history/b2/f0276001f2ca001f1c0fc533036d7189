@@ -1,0 +1,517 @@
+/*****************************************************************************
+* lab2a.c for Lab2A of ECE 153a at UCSB
+* Date of the Last Update:  October 23, 2014
+*****************************************************************************/
+
+#define AO_LAB2A
+
+#include "qpn_port.h"
+#include "bsp.h"
+#include "lab2a.h"
+#include "game.h"
+#include "sevenSeg_new.h"
+#define UP 0b00001
+#define LEFT 0b00010
+#define RIGHT 0b00100
+#define DOWN 0b01000
+#define MIDDLE 0b10000
+
+typedef struct Lab2ATag  {               // Lab2A State machine
+    QActive super;
+}  Lab2A;
+
+/* Setup state machines */
+static QState Lab2A_initial(Lab2A *me);
+
+static QState cordinate_Selector(Lab2A *me);
+static QState test_State(Lab2A *me); // Declare the new state
+static QState ship_Placement_State(Lab2A *me);
+static QState game_State(Lab2A *me);
+static QState game_State_enemy(Lab2A *me);
+
+
+extern int button;
+extern int volume_level;
+extern int push_timeout_time;
+extern int twist_timeout_time;
+extern int count;
+extern int pressed;
+extern int numTimes[18];
+int numTimes[18];
+int in_cordinate_selector = 0; // Flag to indicate if we're in the Cordinate_Selector state
+int gamestate_flag = 0;
+
+Lab2A AO_Lab2A;
+
+void Lab2A_ctor(void) {
+    Lab2A *me = &AO_Lab2A;
+    QActive_ctor(&me->super, (QStateHandler)&Lab2A_initial);
+}
+int boat_selector_flag = 0;
+QState Lab2A_initial(Lab2A *me) {
+    xil_printf("\n\rInitialization");
+    initialize_board();
+	initialize_board_enemy();
+    boat_selector_flag =1;// allow for boat selection which gets turned off at game_state
+
+    return Q_TRAN(&test_State);
+}
+char message[20];
+int cordinates[2];
+
+int index_c = 0;
+char message[20];
+int cordinates[2];
+
+static const int segment_map[16] = {
+    0b0111111, // '0'
+    0b0000110, // '1'
+    0b1011011, // '2'
+    0b1001111, // '3'
+    0b1100110, // '4'
+    0b1101101, // '5'
+    0b1111101, // '6'
+    0b0000111, // '7'
+    0b1111111, // '8'
+    0b1101111, // '9'
+    0b1110111, // 'A'
+    0b1111100, // 'B'
+    0b0111001, // 'C'
+    0b1011110, // 'D'
+    0b1111001, // 'E'
+    0b1110001, // 'F'
+};
+void reset_coordinate_selection(void) {
+    // Reset the index for coordinates
+    index_c = 0;
+
+    // Clear the coordinate array
+    for (int i = 0; i < 2; i++) {
+        cordinates[i] = 0;
+    }
+
+    // Clear the times array
+    for (int i = 0; i < 18; i++) {
+        times[i] = 0;
+    }
+
+    // Clear the message array
+    for (int i = 0; i < 20; i++) {
+        message[i] = '\0';
+    }
+
+    // Reset segment indices
+    index1 = 0;
+    index2=0;
+
+    // Wipe the display
+
+
+    xil_printf("Coordinate selection reset. Start again.\r\n");
+}
+
+int char_to_seg_index(char c) {
+    if (c >= '0' && c <= '9') {
+        return c - '0'; // Map '0'-'9' to 0-9
+    } else if (c >= 'A' && c <= 'F') {
+        return c - 'A' + 10; // Map 'A'-'F' to 10-15
+    }
+    return -1; // Invalid character
+}
+int    index1 = 0;
+int    index2 = 0;
+// Display coordinates on the 7-segment display
+void display_coordinates(char coord1, char coord2) {
+     index1 = char_to_seg_index(coord1);
+     index2 = char_to_seg_index(coord2);
+
+
+       // sevenseg_draw_digit(0, index1); // Display coord1 on digit 0
+
+        //sevenseg_draw_digit(1, index2); // Display coord2 on digit 1
+
+
+   // xil_printf("test");
+
+}
+
+void translate_times(void) {
+    times_index = 0;
+    int results[5];
+    char message[6] = {0}; // Message array to hold Morse code sequence, +1 for null terminator
+
+    // Translate time differences into dots and dashes
+    for (int i = 0; i < 5; i++) {
+        results[i] = times[2 * i + 1] - times[2 * i];
+
+
+        if (results[i] != 0 && results[i] > 30) {
+            message[i] = '-'; // Dash
+        } else if (results[i] != 0 && results[i] <= 30) {
+            message[i] = '.'; // Dot
+        } else {
+            message[i] = '\0'; // End the sequence if no valid result
+            break;
+        }
+    }
+
+    // Classify the Morse code into a character
+    char classified_char = classify_morse(message);
+
+    if (classified_char != '?') {
+        xil_printf("Classified as: %c\r\n", classified_char);
+
+        cordinates[index_c] = classified_char; // Store the classified character in the coordinates array
+        index_c++;
+
+        if (index_c == 2) { // Once two coordinates are collected, process them
+            xil_printf("Coordinate 1: %c\r\n", cordinates[0]);
+            xil_printf("Coordinate 2: %c\r\n", cordinates[1]);
+            display_coordinates(cordinates[0], cordinates[1]);
+
+            // now we have the cordinates and they should be correct we need to shoot these else, maybe make boat placement stage next
+            index_c = 0;
+        }
+    }
+}
+char classify_morse(const char* morse_code) {
+    // Morse code lookup table
+    const struct {
+        const char* morse;
+        char letter;
+    } morse_table[] = {
+        {".-", 'A'}, {"-...", 'B'}, {"-.-.", 'C'}, {"-..", 'D'}, {".", 'E'},
+        {"..-.", 'F'}, {"--.", 'G'}, {"....", 'H'}, {"..", 'I'}, {".---", 'J'},
+        {"-.-", 'K'}, {".-..", 'L'}, {"--", 'M'}, {"-.", 'N'}, {"---", 'O'},
+        {".--.", 'P'}, {"--.-", 'Q'}, {".-.", 'R'}, {"...", 'S'}, {"-", 'T'},
+        {"..-", 'U'}, {"...-", 'V'}, {".--", 'W'}, {"-..-", 'X'}, {"-.--", 'Y'},
+        {"--..", 'Z'}, {"-----", '0'}, {".----", '1'}, {"..---", '2'},
+        {"...--", '3'}, {"....-", '4'}, {".....", '5'}, {"-....", '6'},
+        {"--...", '7'}, {"---..", '8'}, {"----.", '9'}
+    };
+
+    // Search for the Morse code in the table
+    for (int i = 0; i < sizeof(morse_table) / sizeof(morse_table[0]); i++) {
+        if (strcmp(morse_table[i].morse, morse_code) == 0) {
+            return morse_table[i].letter;
+        }
+    }
+
+    // Return '?' for invalid sequences
+    return '?';
+}
+//message will have directly mapped dictionary to determine which character the message is
+/*
+ * Your high self did lots of work...
+ * see ipad for hsm
+ * we worked on cordinate selector which when in this state you are prompted
+ *
+ * both of these conditions should take us out of the Cordiate_Selector state
+ * once we figure out how to run it twice since we need 2 characters translated from morse
+ *
+ * take those two characters and we have soemthing to do with it now
+ *
+ * and back to a normal state (?) maybe one of the btns on normal_state will allows us
+ * to select cordinates, that way we have a signal to send everytime we want a cordinate
+ *
+ *
+ * Normal state ---BTN input--> CordinateSelector (morse away) ----Exit_Sig once cordinate is confirmed -->
+ * Process_Cordiante i think the selector can be used either for place_boats or target_select
+ *
+ *
+ */
+
+static QState cordinate_Selector(Lab2A *me) {
+    switch (Q_SIG(me)) {
+        case Q_ENTRY_SIG: {
+        	 // allow for boat selection
+            xil_printf("Entered cordinate_Selector state\r\n");
+            xil_printf("Select your coordinates by using the ROTARY ENCODER Button in Morse!\r\n");
+            xil_printf("Up Button: Reset Coordinates!\r\n");
+            xil_printf("Middle Button: CONFIRM COORDINATE\r\n");
+            xil_printf("Right Button: Return to Previous State (test_state)!\r\n");
+            xil_printf("Left Button: Does nothing!\r\n");
+            xil_printf("Down Button: Does Nothing!\r\n");
+            xil_printf("\nEnter Morse-Code Now:\r\n");
+            in_cordinate_selector = 1; // Set the flag
+
+            return Q_HANDLED();
+        }
+        case Q_EXIT_SIG: {
+            in_cordinate_selector = 0; // Clear the flag
+            return Q_HANDLED();
+        }
+        case BTN_SIG: {
+            switch (button) {
+
+                case UP: reset_coordinate_selection(); break;
+                case LEFT: update_btn_display2(); break;
+                case RIGHT:
+                	if(boat_selector_flag ==1){
+                		return Q_TRAN(&test_State); // Transition to test_State
+                	}
+                	else{
+
+                		xil_printf("You are unable to go to boat placement state\r\n");
+                	}
+
+
+                case DOWN:
+                	if(gamestate_flag ==1){
+                		return Q_TRAN(&game_State);
+                	}
+                	else{
+                		xil_printf("You are unable to go to game state\r\n");
+                	}
+
+                	break;
+                case MIDDLE: QActive_postISR((QActive *) &AO_Lab2A, TRANSLA_SIG); break;
+            }
+            return Q_HANDLED();
+        }
+        case TRANSLA_SIG: {
+            translate_times();
+
+            // Reset arrays after processing
+            for (int i = 0; i < 18; i++) {
+                times[i] = 0;
+            }
+            for (int i = 0; i < 9; i++) {
+                message[i] = 'x';
+            }
+
+            return Q_HANDLED();
+        }
+    }
+    return Q_SUPER(&QHsm_top); // Parent state for default handling
+}
+
+
+
+static QState game_State(Lab2A *me) {
+    switch (Q_SIG(me)) {
+
+        case Q_ENTRY_SIG: {
+        	int x = 0, y = 0;
+
+        	  int result = ascii_to_coordinates(output1, output2, &x, &y);
+
+        	boat_selector_flag = 0;
+        	gamestate_flag=1; // allows the connection between game state and coordinate selector
+        	xil_printf("All Ships Successfully Placed\r\n"); // Perform the action
+
+        	xil_printf("\nEntered Game State\r\n"); // Perform the action
+        	xil_printf("Click Middle Button to enter Morse to choose Coordinates to fire at!\r\n"); // Perform the action
+        	xil_printf("Click UP Button to confirm!\r\n"); // Perform the action
+
+
+            return Q_HANDLED();
+        }
+        case Q_EXIT_SIG: {
+
+            return Q_HANDLED();
+        }
+        case BTN_SIG: {
+        	switch (button) {
+        		case UP:
+        			check_hit();
+        			// transition to enemy turn
+        			 return Q_TRAN(&game_State_enemy);
+            	break;
+
+        		case MIDDLE:
+                	// go select coordinates
+                	 return Q_TRAN(&cordinate_Selector);
+                    break;
+                	// transition to ship_placement_state to decide where to place ship
+        		case DOWN:
+        			print_enemy_board();
+        			break;
+        		default:
+
+                    break;
+            }
+            return Q_HANDLED();
+        }
+    }
+    return Q_SUPER(&QHsm_top); // Parent state for default handling
+}
+
+static QState game_State_enemy(Lab2A *me) {
+    switch (Q_SIG(me)) {
+
+        case Q_ENTRY_SIG: {
+        	//int x = 0, y = 0;
+
+        	int result = ascii_to_coordinates(output1, output2, &x, &y);
+
+
+
+            return Q_HANDLED();
+        }
+        case Q_EXIT_SIG: {
+
+            return Q_HANDLED();
+        }
+        case BTN_SIG: {
+        	switch (button) {
+        		case UP:
+        			check_hit();
+            	break;
+
+        		case MIDDLE:
+                	// go select coordinates
+                	 return Q_TRAN(&cordinate_Selector);
+                    break;
+                	// transition to ship_placement_state to decide where to place ship
+        		case DOWN:
+        			print_enemy_board();
+        			break;
+        		default:
+
+                    break;
+            }
+            return Q_HANDLED();
+        }
+    }
+    return Q_SUPER(&QHsm_top); // Parent state for default handling
+}
+
+
+static QState test_State(Lab2A *me) {
+    switch (Q_SIG(me)) {
+
+        case Q_ENTRY_SIG: {
+        	xil_printf("Entered test_State\r\n"); // Perform the action
+
+        	xil_printf("Left Button: Select Boat Orientation\r\n");
+            xil_printf("Up Button: Output selected coordinates\r\n");
+            xil_printf("Middle Button: Return to Coordinate Selector state\r\n");
+            xil_printf("Down Button: Print Board\r\n");
+           // initialize_board();
+            return Q_HANDLED();
+        }
+        case Q_EXIT_SIG: {
+
+            return Q_HANDLED();
+        }
+        case BTN_SIG: {
+            switch (button) {
+                case MIDDLE:
+                    return Q_TRAN(&cordinate_Selector); // Transition back to cordinate_Selector
+                    break;
+                case UP:
+
+                	xil_printf("Output1: %c, Output2: %c\r\n", output1, output2);
+                	  break;
+                case DOWN:
+                	print_board();
+                	  break;
+                case LEFT:
+
+                	return Q_TRAN(&ship_Placement_State);
+                	 break;
+                	// transition to ship_placement_state to decide where to place ship
+                default:
+
+                    break;
+            }
+            return Q_HANDLED();
+        }
+    }
+    return Q_SUPER(&QHsm_top); // Parent state for default handling
+}
+
+int ship_limit = 0;
+int orientation;
+
+static QState ship_Placement_State(Lab2A *me) {
+    switch (Q_SIG(me)) {
+
+    case Q_ENTRY_SIG: {
+        xil_printf("Entered Ship Placement State\r\n");
+
+        xil_printf("You can place 3 boats\r\n");
+        xil_printf("Each button shifts the orientation of the boat in that direction\r\n");
+        xil_printf("Click the middle button to confirm your orientation and placement\r\n");
+        xil_printf("Your boat's head is to be placed at the coordinates on your screen.\r\n");
+	  // Declare variables for the coordinates
+        int x = 0, y = 0;
+
+        // Convert output1 and output2 to usable coordinates
+        int result = ascii_to_coordinates(output1, output2, &x, &y);
+
+        if (result == 0) {
+           //xil_printf("Coordinates: X = %d, Y = %d\r\n", x, y);
+        } else {
+            xil_printf("Invalid coordinates. Try again.\r\n");
+        }
+
+        print_board();
+
+        return Q_HANDLED();
+    }
+
+        case Q_EXIT_SIG: {
+            xil_printf("Exiting test_State\r\n"); // Optional cleanup action
+            return Q_HANDLED();
+        }
+        case BTN_SIG: {
+            switch (button) {
+            case MIDDLE:
+                if (ship_limit < 3) {
+                    xil_printf("Attempting to place ship...\r\n");
+
+                    // Call place_ship with the current orientation
+                    int result = place_ship(orientation);
+
+                    if (result == 0) { // Successful placement
+
+                        xil_printf("Ship placed successfully! Ships remaining: %d\r\n", ship_limit);
+                        print_board();
+                        ship_limit++;
+                        if(ship_limit ==3){
+
+                            return Q_TRAN(&game_State);
+                        }else{
+                            return Q_TRAN(&cordinate_Selector);
+                        }
+                    } else {
+                        xil_printf("Failed to place ship. Try again.\r\n");
+                    }
+                } else {
+                    xil_printf("Ship placement limit reached. No more ships can be placed.\r\n");
+                    // kick out of this state and go to the game state!!!!
+                    return Q_TRAN(&game_State);
+                }
+
+
+                    return Q_TRAN(&test_State); // Transition back to test_state to confirm ship location
+                    break;
+                case UP:
+                	orientation = 2;
+                	  break;
+// change orentation up
+                case DOWN:
+                	orientation = 0;
+                	  break;
+//change orentation down which means that the head of the ship will be in the cordinate locations from output0 and output1 and the butt of the ship will be 3 locations down
+                case LEFT:
+                	orientation = 3;
+                	  break;
+// same thing as down but butt of ship is to the left
+                case RIGHT:
+                	orientation = 1;
+
+                	  break;
+// same thing as downbut butt of ship is to the right
+                default:
+
+                    break;
+            }
+            return Q_HANDLED();
+        }
+    }
+    return Q_SUPER(&QHsm_top); // Parent state for default handling
+}
+

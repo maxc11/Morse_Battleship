@@ -1,0 +1,18 @@
+// game.h
+#ifndef GAME_H
+#define GAME_H
+
+#define BOARD_SIZE_X 6 // Board size for x-axis (0-5)
+#define BOARD_SIZE_Y 6 // Board size for y-axis (A-F)
+
+// Initialize the board
+void initialize_board(void);
+
+// Place a ship on the board
+int place_ship(int x, int y, int ship_length, int orientation);
+int ascii_to_coordinates(int output1, int output2, int *x, int *y);
+// Print the board for debugging purposes
+void print_board(void);
+extern int orientation;
+extern int y,x;
+#endif // GAME_H

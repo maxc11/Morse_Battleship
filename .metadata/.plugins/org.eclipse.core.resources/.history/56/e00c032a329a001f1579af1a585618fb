@@ -1,0 +1,253 @@
+/*****************************************************************************
+* lab2a.c for Lab2A of ECE 153a at UCSB
+* Date of the Last Update:  October 23,2014
+*****************************************************************************/
+
+#define AO_LAB2A
+
+#include "qpn_port.h"
+#include "bsp.h"
+#include "lab2a.h"
+
+extern int turned;
+extern int count;
+extern int pressed;
+extern int twist_timeout_time;
+extern int push_timeout_time;
+extern int button;
+
+
+typedef struct Lab2ATag  {               //Lab2A State machine
+	QActive super;
+}  Lab2A;
+
+/* Setup state machines */
+/**********************************************************************/
+static QState Lab2A_initial (Lab2A *me);
+static QState displayer (Lab2A *me);
+static QState stagnant  (Lab2A *me);
+static QState changing      (Lab2A *me);
+static QState value_change  (Lab2A *me);
+static QState btn_display  (Lab2A *me);
+static QState changing_nothing  (Lab2A *me);
+
+
+#define	UP 0b00001
+#define	LEFT 0b00010
+#define	RIGHT 0b00100
+#define	DOWN 0b01000
+#define	MIDDLE 0b10000
+
+
+/**********************************************************************/
+
+
+Lab2A AO_Lab2A;
+
+
+void Lab2A_ctor(void)  {
+	Lab2A *me = &AO_Lab2A;
+	QActive_ctor(&me->super, (QStateHandler)&Lab2A_initial);
+}
+
+
+QState Lab2A_initial(Lab2A *me) {
+	xil_printf("\n\rInitialization");
+	initial_background();
+    return Q_TRAN(&displayer);
+}
+
+QState displayer(Lab2A *me) {
+	switch (Q_SIG(me)) {
+		case Q_ENTRY_SIG: {
+			return Q_HANDLED();
+			}
+		case Q_INIT_SIG: {
+			return Q_TRAN(&stagnant);
+			}
+		case ENCODER_PUSH_SIG: {
+			xil_printf("f%if", Q_SIG(me));
+			return Q_TRAN(&value_change);
+			}
+		case ENCODER_PLUS_SIG: {
+			return Q_TRAN(&value_change);
+			}
+		case ENCODER_MINUS_SIG: {
+			return Q_TRAN(&value_change);
+			}
+		case BTN_SIG: {
+			QActive_postISR((QActive *)&AO_Lab2A, BTN_SIG);
+			return Q_TRAN(&btn_display);
+			}
+
+	}
+	xil_printf("return to top   ");
+	return Q_SUPER(&QHsm_top);
+}
+
+QState changing(Lab2A *me) {
+	//xil_printf("change");
+	switch (Q_SIG(me)) {
+		case Q_ENTRY_SIG: {
+			return Q_HANDLED();
+			}
+		case Q_INIT_SIG: {
+			return Q_HANDLED();
+			}
+		case ENCODER_PLUS_SIG: {
+			return Q_TRAN(&value_change);
+			}
+		case ENCODER_MINUS_SIG: {
+			return Q_TRAN(&value_change);
+			}
+		case ENCODER_PUSH_SIG: {
+			//xil_printf("%i", Q_SIG(me));
+			return Q_TRAN(&value_change);
+		}
+		case BTN_TIMEOUT_SIG: {
+			reset_display(3);
+					return Q_TRAN(&stagnant);
+				}
+
+
+	}
+	return Q_SUPER(&displayer);
+}
+
+QState stagnant(Lab2A *me) {
+	switch (Q_SIG(me)) {
+		case Q_ENTRY_SIG: {
+			return Q_HANDLED();
+			}
+			
+		case Q_INIT_SIG: {
+			return Q_HANDLED();
+			}
+		case TWIST_TIMEOUT_SIG: {
+			reset_display(4);
+			return Q_HANDLED();
+			}
+		case BTN_TIMEOUT_SIG: {
+			reset_display(3);
+			return Q_HANDLED();
+					}
+		case ENCODER_PLUS_SIG: {
+			QActive_postISR((QActive *)&AO_Lab2A, ENCODER_PLUS_SIG);
+			return Q_TRAN(&value_change);
+			}
+		case ENCODER_MINUS_SIG: {
+			QActive_postISR((QActive *)&AO_Lab2A, ENCODER_MINUS_SIG);
+			return Q_TRAN(&value_change);
+			}
+		case ENCODER_PUSH_SIG: {
+			QActive_postISR((QActive *)&AO_Lab2A, ENCODER_PUSH_SIG);
+			return Q_TRAN(&value_change);
+				}
+	}
+	return Q_SUPER(&displayer);
+}
+
+
+/* Create Lab2A_on state and do any initialization code if needed */
+/******************************************************************/
+
+QState changing_nothing(Lab2A *me) {
+	switch (Q_SIG(me)) {
+			case Q_ENTRY_SIG: {
+				xil_printf("Startup State A\n");
+				return Q_HANDLED();
+			}
+
+//			case ENCODER_SIG: {
+//				xil_printf("Encoder Up from State A\n");
+//				return Q_TRAN(&value_change);
+//			}
+
+//			case BTN_SIG: {
+//				xil_printf("Encoder Down from State A\n");
+//				return Q_TRAN(&btn_display);
+//			}
+
+		}
+	return Q_SUPER(&changing);
+
+}
+
+
+QState value_change(Lab2A *me) {
+	static int volume = 0;
+	static int volume_prev = 0;
+	twist_timeout_time = count;
+
+	xil_printf("%i", Q_SIG(me));
+
+
+	switch (Q_SIG(me)) {
+		case Q_ENTRY_SIG: {
+		return Q_HANDLED();
+		}
+		case Q_INIT_SIG: {
+			return Q_HANDLED();
+			}
+		case Q_EXIT_SIG: {
+			return Q_HANDLED();
+			}
+		case ENCODER_PLUS_SIG: {
+			if(!pressed){volume++;}
+			if(volume > 63) volume = 63;
+			update_display(volume);
+			return Q_HANDLED();
+		}
+		case ENCODER_MINUS_SIG: {
+			if(!pressed){volume--;}
+			if(volume < 0) volume = 0;
+			update_display(volume);
+			return Q_HANDLED();
+		}
+		case ENCODER_PUSH_SIG: {
+					if(pressed) {volume_prev = volume; volume = 0;}
+					if(!pressed) {volume = volume_prev;}
+					update_display(volume);
+					return Q_HANDLED();
+
+				}
+		case TWIST_TIMEOUT_SIG: {
+
+					return Q_TRAN(&stagnant);
+		}
+		//rises the moon
+	}
+
+	return Q_SUPER(&changing);
+
+}
+
+QState btn_display(Lab2A *me) {
+	switch (Q_SIG(me)) {
+		case Q_ENTRY_SIG: {
+			return Q_HANDLED();
+		}
+
+		case BTN_SIG: {
+			push_timeout_time = count;
+			switch(button) {
+					case(UP): update_btn_display1();
+					break;
+					case(LEFT): update_btn_display2();
+					break;
+					case(RIGHT): update_btn_display3();
+					break;
+					case(DOWN): update_btn_display4();
+					break;
+					case(MIDDLE): update_btn_display5();
+					break;
+				}
+			return Q_HANDLED();
+		}
+
+
+	}
+
+	return Q_SUPER(&changing);
+
+}

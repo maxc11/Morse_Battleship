@@ -1,0 +1,189 @@
+// game.c
+#include "game.h"
+#include <stdio.h>
+#include <ctype.h>
+
+#define EMPTY '.' // Symbol for an empty cell
+#define SHIP 'X'  // Symbol for a ship cell
+
+char user_board[BOARD_SIZE_X][BOARD_SIZE_Y];
+char enemy_board[BOARD_SIZE_X][BOARD_SIZE_Y];
+
+// Initialize the board
+void initialize_board(void) {
+    for (int i = 0; i < BOARD_SIZE_X; i++) {
+        for (int j = 0; j < BOARD_SIZE_Y; j++) {
+            user_board[i][j] = EMPTY;
+        }
+    }
+}
+
+void initialize_board_enemy(void) {
+    for (int i = 0; i < BOARD_SIZE_X; i++) {
+        for (int j = 0; j < BOARD_SIZE_Y; j++) {
+            enemy_board[i][j] = SHIP;
+        }
+    }
+}
+
+// Helper function to convert y-coordinate from char to index
+int y_to_index(char y) {
+    y = toupper(y);
+    if (y >= 'A' && y <= 'F') {
+        return y - 'A';
+    }
+    return -1; // Invalid input
+}
+
+int test = 0;
+int test_x = 0; // Global variable for x-coordinate
+int test_y = 0; // Global variable for y-coordinate
+
+// Helper function to convert ASCII output to coordinates
+int ascii_to_coordinates(int output1, int output2, int *x, int *y) {
+    int temp_x = y_to_index((char)output2); // Convert x-coordinate (letter)
+    int temp_y = output1 - '0';            // Convert y-coordinate (number)
+
+    if (temp_x == -1 || temp_y < 0 || temp_y >= BOARD_SIZE_X) {
+        xil_printf("Invalid coordinates: output1 = %c, output2 = %c\n", (char)output1, output2);
+        return -1; // Failure
+    }
+
+    *x = temp_x; // Update x-coordinate via pointer
+    *y = temp_y; // Update y-coordinate via pointer
+
+    // Store and print test values
+    test_x = *x;
+    test_y = *y;
+
+    return 0; // Success
+}
+
+// Function to check if a coordinate on the enemy board hits a ship
+void check_hit(char board[BOARD_SIZE_X][BOARD_SIZE_Y]) {
+    // Check bounds
+	xil_printf("Attempting to fire at %d, %d...\r\n", test_x,test_y);
+    if (test_x < 0 || test_x >= BOARD_SIZE_Y || test_y < 1 || test_y >= BOARD_SIZE_X) {
+        xil_printf("Error: Coordinates out of bounds (X = %d, Y = %d).\r\n", test_x, test_y);
+            }
+
+    // Check the cell on the enemy board
+    if (board[test_y][test_x] == SHIP) {
+    	board[test_y][test_x] = 'H'; // Mark as hit
+        xil_printf("Hit! A ship was hit at coordinates (X = %d, Y = %d).\r\n", test_x, test_y);
+
+    } else if (board[test_y][test_x] == EMPTY) {
+    	board[test_y][test_x] = 'M'; // Mark as miss
+        xil_printf("Miss! No ship at coordinates (X = %d, Y = %d).\r\n", test_x, test_y);
+
+    } else {
+        xil_printf("Error: Cell already targeted (X = %d, Y = %d).\r\n", test_x, test_y);
+
+    }
+    print_enemy_board();
+}
+
+// Place a ship on the board
+int place_ship(int orientation) {
+    xil_printf("Confirm in place_ship()!\r\n");
+
+    // Determine ship placement based on orientation
+    switch (orientation) {
+        case 0: // Vertical Down
+            if (test_y + 2 >= BOARD_SIZE_X) { // Check bounds
+                xil_printf("Error: Ship out of bounds vertically (down).\r\n");
+                return -1; // Ship placement failed
+            }
+            for (int i = 0; i < 3; i++) {
+                if (user_board[test_y + i][test_x] != EMPTY) { // Check collision
+                    xil_printf("Error: Collision detected at (%d, %d).\r\n", test_y + i, test_x);
+                    return -1; // Ship placement failed
+                }
+            }
+            for (int i = 0; i < 3; i++) { // Place the ship
+                user_board[test_y + i][test_x] = SHIP;
+            }
+            break;
+
+        case 1: // Horizontal Right
+            if (test_x + 2 >= BOARD_SIZE_Y) { // Check bounds
+                xil_printf("Error: Ship out of bounds horizontally (right).\r\n");
+                return -1; // Ship placement failed
+            }
+            for (int i = 0; i < 3; i++) {
+                if (user_board[test_y][test_x + i] != EMPTY) { // Check collision
+                    xil_printf("Error: Collision detected at (%d, %d).\r\n", test_y, test_x + i);
+                    return -1; // Ship placement failed
+                }
+            }
+            for (int i = 0; i < 3; i++) { // Place the ship
+                user_board[test_y][test_x + i] = SHIP;
+            }
+            break;
+
+        case 2: // Vertical Up
+            if (test_y - 2 < 1) { // Check bounds
+                xil_printf("Error: Ship out of bounds vertically (up).\r\n");
+                return -1; // Ship placement failed
+            }
+            for (int i = 0; i < 3; i++) {
+                if (user_board[test_y - i][test_x] != EMPTY) { // Check collision
+                    xil_printf("Error: Collision detected at (%d, %d).\r\n", test_y - i, test_x);
+                    return -1; // Ship placement failed
+                }
+            }
+            for (int i = 0; i < 3; i++) { // Place the ship
+                user_board[test_y - i][test_x] = SHIP;
+            }
+            break;
+
+        case 3: // Horizontal Left
+            if (test_x - 2 < 0) { // Check bounds
+                xil_printf("Error: Ship out of bounds horizontally (left).\r\n");
+                return -1; // Ship placement failed
+            }
+            for (int i = 0; i < 3; i++) {
+                if (user_board[test_y][test_x - i] != EMPTY) { // Check collision
+                    xil_printf("Error: Collision detected at (%d, %d).\r\n", test_y, test_x - i);
+                    return -1; // Ship placement failed
+                }
+            }
+            for (int i = 0; i < 3; i++) { // Place the ship
+                user_board[test_y][test_x - i] = SHIP;
+            }
+            break;
+
+        default:
+            xil_printf("Error: Invalid orientation.\r\n");
+            return -1; // Ship placement failed
+    }
+
+    xil_printf("Ship placed successfully!\r\n");
+    print_board(); // Print the updated board for debugging
+    return 0; // Success
+}
+
+// Print the board for debugging purposes
+void print_board(void) {
+    printf("  A B C D E F\n");
+    for (int i = 1; i < BOARD_SIZE_X; i++) {
+        printf("%d ", i);
+        for (int j = 0; j < BOARD_SIZE_Y; j++) {
+            printf("%c ", user_board[i][j]);
+        }
+        printf("\n");
+    }
+}
+
+// Print the enemy board for debugging purposes
+void print_enemy_board(void) {
+    printf("  A B C D E F\n");
+    for (int i = 1; i < BOARD_SIZE_X; i++) {
+        printf("%d ", i);
+        for (int j = 0; j < BOARD_SIZE_Y; j++) {
+            printf("%c ", enemy_board[i][j]);
+        }
+        printf("\n");
+    }
+}
+

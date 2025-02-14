@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<section name="Workbench">
+	<section name="org.eclipse.ui.texteditor.FindReplaceDialog">
+		<item key="selection" value=""/>
+		<item key="wrap" value="false"/>
+		<item key="casesensitive" value="false"/>
+		<item key="wholeword" value="false"/>
+		<item key="incremental" value="false"/>
+		<item key="isRegEx" value="false"/>
+		<list key="findhistory">
+			<item value="user_"/>
+			<item value="user_fires"/>
+			<item value="check_hit"/>
+			<item value="check"/>
+			<item value="reload"/>
+			<item value="reloa"/>
+			<item value="time"/>
+			<item value="gettime"/>
+			<item value="gettimeof"/>
+			<item value="print_user_board"/>
+			<item value="print_user"/>
+			<item value="enemy_fires"/>
+			<item value="print_board"/>
+			<item value="CHECK_hi"/>
+			<item value="ascii_to_coordinates"/>
+		</list>
+		<list key="replacehistory">
+			<item value="rotary_fsm."/>
+		</list>
+	</section>
+	<section name="org.eclipse.ui.texteditor.FindReplaceDialog_dialogBounds">
+		<item key="DIALOG_X_ORIGIN" value="609"/>
+		<item key="DIALOG_Y_ORIGIN" value="441"/>
+		<item key="DIALOG_WIDTH" value="284"/>
+		<item key="DIALOG_HEIGHT" value="391"/>
+		<item key="DIALOG_FONT_NAME" value="1|Segoe UI|9.0|0|WINDOWS|1|-12|0|0|0|400|0|0|0|1|0|0|0|0|Segoe UI"/>
+	</section>
+</section>

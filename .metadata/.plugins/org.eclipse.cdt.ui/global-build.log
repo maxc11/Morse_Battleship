@@ -1,0 +1,38 @@
+Nothing to build in platform 'lab2bplat'
+
+14:07:57 **** Incremental Build of configuration Debug for project lab2b_app ****
+make all 
+'Building file: ../src/game.c'
+'Invoking: MicroBlaze gcc compiler'
+mb-gcc -Wall -O0 -g3 -c -fmessage-length=0 -MT"src/game.o" -IC:/Users/maxco/Desktop/morse/lab2bplat/export/lab2bplat/sw/lab2bplat/standalone_domain/bspinclude/include -mlittle-endian -mxl-barrel-shift -mcpu=v11.0 -mno-xl-soft-mul -Wl,--no-relax -ffunction-sections -fdata-sections -MMD -MP -MF"src/game.d" -MT"src/game.o" -o "src/game.o" "../src/game.c"
+../src/game.c: In function 'check_hit':
+../src/game.c:87:13: warning: implicit declaration of function 'add_target_queues' [-Wimplicit-function-declaration]
+   87 |             add_target_queues(test_x, test_y);
+      |             ^~~~~~~~~~~~~~~~~
+../src/game.c: At top level:
+../src/game.c:96:6: warning: conflicting types for 'add_target_queues'; have 'void(int,  int)'
+   96 | void add_target_queues(int x, int y) {
+      |      ^~~~~~~~~~~~~~~~~
+../src/game.c:87:13: note: previous implicit declaration of 'add_target_queues' with type 'void(int,  int)'
+   87 |             add_target_queues(test_x, test_y);
+      |             ^~~~~~~~~~~~~~~~~
+../src/game.c: In function 'enemy_fires':
+../src/game.c:265:5: warning: implicit declaration of function 'srand' [-Wimplicit-function-declaration]
+  265 |     srand(42);
+      |     ^~~~~
+../src/game.c:285:24: warning: implicit declaration of function 'rand' [-Wimplicit-function-declaration]
+  285 |             random_x = rand() % BOARD_SIZE_Y;
+      |                        ^~~~
+'Finished building: ../src/game.c'
+' '
+'Building target: lab2b_app.elf'
+'Invoking: MicroBlaze gcc linker'
+mb-gcc -Wl,-T -Wl,../src/lscript.ld -LC:/Users/maxco/Desktop/morse/lab2bplat/export/lab2bplat/sw/lab2bplat/standalone_domain/bsplib/lib -mlittle-endian -mxl-barrel-shift -mcpu=v11.0 -mno-xl-soft-mul -Wl,--no-relax -Wl,--gc-sections -o "lab2b_app.elf"  ./src/xgpio_examplestuff/xgpio_tapp_example.o ./src/xgpio_examplestuff/xintc_tapp_example.o ./src/xgpio_examplestuff/xspi_selftest_example.o ./src/xgpio_examplestuff/xtmrctr_intr_example.o ./src/xgpio_examplestuff/xtmrctr_selftest_example.o  ./src/bsp.o ./src/fonts.o ./src/game.o ./src/lab2a.o ./src/lcd.o ./src/main.o ./src/qepn.o ./src/qfn.o ./src/qfn_init.o ./src/sevenSeg_new.o  ./.metadata/.plugins/org.eclipse.cdt.make.core/specs.o   -Wl,--start-group,-lxil,-lgcc,-lc,--end-group
+'Finished building target: lab2b_app.elf'
+' '
+'Invoking: MicroBlaze Print Size'
+mb-size lab2b_app.elf  |tee "lab2b_app.elf.size"
+   text	   data	    bss	    dec	    hex	filename
+  94616	   1892	  10572	 107080	  1a248	lab2b_app.elf
+'Finished building: lab2b_app.elf.size'
+' '

@@ -1,0 +1,197 @@
+/*****************************************************************************
+* lab2a.c for Lab2A of ECE 153a at UCSB
+* Date of the Last Update:  October 23,2014
+*****************************************************************************/
+
+#define AO_LAB2A
+
+#include "qpn_port.h"
+#include "bsp.h"
+#include "lab2a.h"
+
+extern int turned;
+extern int count;
+extern int pressed;
+extern int twist_timeout_time;
+extern int push_timeout_time;
+
+
+typedef struct Lab2ATag  {               //Lab2A State machine
+	QActive super;
+}  Lab2A;
+
+/* Setup state machines */
+/**********************************************************************/
+static QState Lab2A_initial (Lab2A *me);
+static QState displayer (Lab2A *me);
+static QState stagnant  (Lab2A *me);
+static QState changing      (Lab2A *me);
+static QState value_change  (Lab2A *me);
+static QState btn_display  (Lab2A *me);
+static QState changing_nothing  (Lab2A *me);
+
+
+/**********************************************************************/
+
+
+Lab2A AO_Lab2A;
+
+
+void Lab2A_ctor(void)  {
+	Lab2A *me = &AO_Lab2A;
+	QActive_ctor(&me->super, (QStateHandler)&Lab2A_initial);
+}
+
+
+QState Lab2A_initial(Lab2A *me) {
+	xil_printf("\n\rInitialization");
+	initial_background();
+    return Q_TRAN(&displayer);
+}
+
+QState displayer(Lab2A *me) {
+	switch (Q_SIG(me)) {
+		case Q_ENTRY_SIG: {
+			return Q_HANDLED();
+			}
+		case Q_INIT_SIG: {
+			return Q_TRAN(&stagnant);
+			}
+		case ENCODER_PUSH_SIG: {
+			return Q_TRAN(&changing);
+			}
+		case ENCODER_PLUS_SIG: {
+			return Q_TRAN(&changing);
+			}
+		case ENCODER_MINUS_SIG: {
+			return Q_TRAN(&changing);
+			}
+
+
+	}
+
+	return Q_SUPER(&QHsm_top);
+}
+
+QState changing(Lab2A *me) {
+	//xil_printf("change");
+	switch (Q_SIG(me)) {
+		case Q_ENTRY_SIG: {
+			return Q_TRAN(&changing_nothing);
+			}
+		case ENCODER_PLUS_SIG: {
+			return Q_TRAN(&value_change);
+			}
+		case ENCODER_MINUS_SIG: {
+			return Q_TRAN(&value_change);
+			}
+		case ENCODER_PUSH_SIG: {
+			return Q_TRAN(&value_change);
+		}
+
+	}
+	return Q_SUPER(&displayer);
+}
+
+QState stagnant(Lab2A *me) {
+	switch (Q_SIG(me)) {
+		case Q_ENTRY_SIG: {
+			return Q_HANDLED();
+			}
+			
+		case Q_INIT_SIG: {
+			return Q_HANDLED();
+			}
+		case TWIST_TIMEOUT_SIG: {
+			reset_display(4);
+			return Q_HANDLED();
+			}
+	}
+	return Q_SUPER(&displayer);
+}
+
+
+/* Create Lab2A_on state and do any initialization code if needed */
+/******************************************************************/
+
+QState changing_nothing(Lab2A *me) {
+	switch (Q_SIG(me)) {
+			case Q_ENTRY_SIG: {
+				xil_printf("Startup State A\n");
+				return Q_HANDLED();
+			}
+
+//			case ENCODER_SIG: {
+//				xil_printf("Encoder Up from State A\n");
+//				return Q_TRAN(&value_change);
+//			}
+
+//			case BTN_SIG: {
+//				xil_printf("Encoder Down from State A\n");
+//				return Q_TRAN(&btn_display);
+//			}
+
+		}
+	return Q_SUPER(&changing);
+
+}
+
+
+QState value_change(Lab2A *me) {
+	static int volume = 0;
+	static int volume_prev = 0;
+	twist_timeout_time = count;
+	switch (Q_SIG(me)) {
+		case Q_ENTRY_SIG: {
+		return Q_HANDLED();
+		}
+		case ENCODER_PLUS_SIG: {
+			if(!pressed){volume++;}
+			if(volume > 63) volume = 63;
+			update_display(volume);
+			return Q_HANDLED();
+		}
+		case ENCODER_MINUS_SIG: {
+			if(!pressed){volume--;}
+			if(volume < 0) volume = 0;
+			update_display(volume);
+			return Q_HANDLED();
+		}
+		case ENCODER_PUSH_SIG: {
+					if(pressed) {volume_prev = volume; volume = 0;}
+					if(!pressed) {volume = volume_prev;}
+					update_display(volume);
+					return Q_HANDLED();
+
+				}
+		case TWIST_TIMEOUT_SIG: {
+					return Q_TRAN(&stagnant);
+		}
+		case BTN_TIMEOUT_SIG: {
+					return Q_TRAN(&stagnant);
+				}
+		//rises the moon
+	}
+
+	return Q_SUPER(&changing);
+
+}
+
+QState btn_display(Lab2A *me) {
+	switch (Q_SIG(me)) {
+		case Q_ENTRY_SIG: {
+			xil_printf("Startup State B\n");
+			return Q_HANDLED();
+		}
+
+		case ENCODER_PUSH_SIG: {
+			xil_printf("Encoder Up from State B\n");
+			return Q_HANDLED();
+		}
+
+	}
+
+	return Q_SUPER(&changing);
+
+}
+
